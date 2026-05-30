@@ -118,7 +118,12 @@ class ApplicationController < ActionController::Base
   end
 
   def render_not_found
-    render file: Rails.root.join("public/404.html"), status: :not_found, layout: false
+    @body_class = "error-page-body"
+    respond_to do |format|
+      format.html { render "errors/not_found", status: :not_found, layout: "application" }
+      format.json { render json: { error: "Not found" }, status: :not_found }
+      format.any { head :not_found }
+    end
   end
 
   def user_not_authorized(exception)
@@ -196,6 +201,7 @@ class ApplicationController < ActionController::Base
   end
 
   def handle_error(exception)
+    @body_class = "error-page-body"
     event_id = Sentry.last_event_id || Sentry.capture_exception(exception)&.event_id
     @trace_id = event_id || request.request_id
     @exception = exception if current_user&.admin?
@@ -253,6 +259,13 @@ class ApplicationController < ActionController::Base
     return if identity_payload.blank?
 
     current_user.apply_hca_verification_payload!(identity_payload)
+    current_user.reload
+
+    if current_user.identity_verified?
+      redirect_to profile_path(current_user.display_name), notice: "You're verified — your work is now public!" and return
+    else
+      redirect_to profile_path(current_user.display_name, idv_check: 1) and return
+    end
   rescue StandardError => e
     Rails.logger.warn("Portal return identity refresh failed: #{e.class}: #{e.message}")
   end

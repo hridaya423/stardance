@@ -28,17 +28,25 @@
             </span>
           <% end %>
 
+          <% label_block = capture do %>
+            <span class="sidebar__nav-label"><%= item[:label] %></span>
+            <% if item[:notify] %>
+              <span class="sidebar__nav-notify-dot" aria-hidden="true"></span>
+            <% end %>
+          <% end %>
+
           <% if item[:locked] %>
             <button type="button"
                     class="<%= link_classes %> sidebar__nav-link--locked"
-                    data-controller="locked-tab"
-                    data-locked-tab-message-value="<%= item[:locked_message] %>"
+                    data-controller="tooltip"
+                    data-tooltip-message-value="<%= item[:locked_message] %>"
+                    data-tooltip-position-value="right"
                     data-slug="<%= item[:slug] %>"
                     aria-disabled="true"
                     aria-haspopup="dialog"
                     aria-label="<%= item[:label] %> (locked) — click for details">
               <%= icon_block %>
-              <span class="sidebar__nav-label"><%= item[:label] %></span>
+              <%= label_block %>
               <span class="sidebar__nav-lock" aria-hidden="true">
                 <%= inline_svg_tag "icons/lock.svg", class: "sidebar__nav-lock-icon" %>
               </span>
@@ -46,12 +54,12 @@
           <% elsif item[:path] == "#" %>
             <span class="<%= link_classes %> sidebar__nav-link--inert" data-slug="<%= item[:slug] %>" aria-disabled="true">
               <%= icon_block %>
-              <span class="sidebar__nav-label"><%= item[:label] %></span>
+              <%= label_block %>
             </span>
           <% else %>
             <%= link_to item[:path], class: link_classes, aria: (active?(item) ? { current: "page" } : {}), data: { turbo: true, active_prefix: item[:active_prefix], slug: item[:slug] }.compact do %>
               <%= icon_block %>
-              <span class="sidebar__nav-label"><%= item[:label] %></span>
+              <%= label_block %>
             <% end %>
           <% end %>
         </li>
@@ -63,7 +71,7 @@
     <div class="sidebar__user-card">
       <div class="sidebar__user-meta">
         <span class="sidebar__user-meta-label">logged in as</span>
-        <%= link_to user_path(user), class: "sidebar__user-meta-handle", data: { turbo: true } do %>
+        <%= link_to profile_path(user.display_name), class: "sidebar__user-meta-handle", data: { turbo: true } do %>
           @<%= user.display_name %>
         <% end %>
       </div>

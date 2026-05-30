@@ -5,6 +5,11 @@ class UsersController < ApplicationController
   ALLOWED_TABS = %w[feed devlogs replies projects].freeze
 
   def show
+    if profile_hidden_from_viewer?
+      render "users/unverified_placeholder", layout: "application"
+      return
+    end
+
     tab = params[:tab].presence_in(ALLOWED_TABS) || "feed"
     load_profile(tab)
   end
@@ -16,7 +21,7 @@ class UsersController < ApplicationController
           flash.now[:notice] = "Profile updated."
           render turbo_stream: turbo_stream.update("flash-region", partial: "shared/flash")
         end
-        format.html { redirect_to @user, notice: "Profile updated." }
+        format.html { redirect_to profile_path(@user.display_name), notice: "Profile updated." }
       end
     else
       respond_to do |format|
@@ -46,7 +51,13 @@ class UsersController < ApplicationController
   private
 
   def set_user
-    @user = User.includes(:preference).find(params[:id])
+    @user = User.includes(:preference)
+
+    if params[:username].present?
+      @user = @user.find_by!("LOWER(display_name) = ?", params[:username].downcase)
+    else
+      @user = @user.find(params[:id])
+    end
   end
 
   def authorize_user
@@ -75,6 +86,7 @@ class UsersController < ApplicationController
   def profile_activity
     scope = Post.joins(:project)
                 .merge(Project.not_deleted)
+                .visible_to(current_user)
                 .where(user_id: @user.id)
                 .preload(:project, :user, postable: [ { attachments_attachments: :blob } ])
                 .order(created_at: :desc)
@@ -106,5 +118,14 @@ class UsersController < ApplicationController
 
   def user_params
     params.require(:user).permit(:bio, :banner, :display_name)
+  end
+
+  # Non-admin, non-self viewers see a placeholder until the user verifies.
+  def profile_hidden_from_viewer?
+    return false if @user.identity_verified?
+    return false if current_user&.admin?
+    return false if current_user&.id == @user.id
+
+    true
   end
 end
